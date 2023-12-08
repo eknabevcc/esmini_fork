@@ -2589,6 +2589,42 @@ TEST(PositionModeTest, TestModeBitmasks)
     odr->Clear();
 }
 
+TEST(LaneMaterialTest, TestLaneFriction)
+{
+    ASSERT_EQ(roadmanager::Position::LoadOpenDrive("../../../EnvironmentSimulator/Unittest/xodr/straight_highway_500m.xodr"), true);
+    roadmanager::OpenDrive *odr = Position::GetOpenDrive();
+    ASSERT_NE(odr, nullptr);
+
+    EXPECT_EQ(odr->GetNumOfRoads(), 1);
+
+    Road *road = odr->GetRoadById(0);
+    EXPECT_EQ(road->GetId(), 0);
+    LaneSection *lane_section = road->GetLaneSectionByIdx(0);
+    EXPECT_EQ(lane_section->GetNumberOfLanes(), 7);
+
+    Lane *lane = lane_section->GetLaneById(2);
+    EXPECT_EQ(lane->GetNumberOfMaterials(), 3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(0)->s_offset, 0.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(0)->friction, 1.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(1)->s_offset, 100.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(1)->friction, 0.4, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(2)->s_offset, 120.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(2)->friction, 1.0, 1e-3);
+    EXPECT_EQ(lane->GetMaterialByIdx(3), nullptr);
+
+    lane = lane_section->GetLaneById(-3);
+    EXPECT_EQ(lane->GetNumberOfMaterials(), 4);
+    EXPECT_NEAR(lane->GetMaterialByIdx(0)->s_offset, 0.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(0)->friction, 1.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(1)->s_offset, 180.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(1)->friction, 0.2, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(2)->s_offset, 190.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(2)->friction, 0.5, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(3)->s_offset, 200.0, 1e-3);
+    EXPECT_NEAR(lane->GetMaterialByIdx(3)->friction, 1.2, 1e-3);
+    EXPECT_EQ(lane->GetMaterialByIdx(4), nullptr);
+}
+
 // Uncomment to print log output to console
 // #define LOG_TO_CONSOLE
 

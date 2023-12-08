@@ -31,6 +31,11 @@
 #define MAX_GEOM_ERROR  0.1                   // maximum distance from the 3D geometry to the OSI lines
 #define MAX_GEOM_LENGTH 50                    // maximum length of a road geometry mesh segment
 
+bool compare_s_values(double s0, double s1)
+{
+    return (fabs(s1 - s0) < 0.1);
+}
+
 osg::ref_ptr<osg::Texture2D> RoadGeom::ReadTexture(std::string filename)
 {
     osg::ref_ptr<osg::Texture2D> tex = 0;
@@ -461,7 +466,7 @@ RoadGeom::RoadGeom(roadmanager::OpenDrive* odr)
             // create a list to keep track of current s-value for each lane
             std::vector<int> s_index(static_cast<unsigned int>(lsec->GetNumberOfLanes()), 0);
 
-            // create a 2d list of positions for vertices, nr_of_lanes x nr_of_s-values
+            // create a 2d list of positions for vertices, nr_of_s-values x nr_of_lanes
             typedef struct
             {
                 double x;
@@ -470,6 +475,7 @@ RoadGeom::RoadGeom(roadmanager::OpenDrive* odr)
                 double h;
                 double slope;
                 double s;
+                double friction;
             } GeomPoint;
             std::vector<std::vector<GeomPoint>> geom_point_list;
             std::vector<GeomPoint>              geom_point;
@@ -477,17 +483,46 @@ RoadGeom::RoadGeom(roadmanager::OpenDrive* odr)
             roadmanager::Position pos;
             s_list.clear();
 
-            bool done = false;
-            for (int counter = 1; !done && counter > 0; counter++)
+            // First populate s values of the material elements
+            // For each material a new friction segment is to be added
+            // Loop over material friction segments, insert new vertices if needed
+            std::vector<double> friction_s_list;
+            for (size_t k = 0; k < static_cast<unsigned int>(lsec->GetNumberOfLanes()); k++)
+            {
+                lane = lsec->GetLaneByIdx(k);
+                for (size_t l = 0; l < lane->GetNumberOfMaterials(); l++)
+                {
+                    friction_s_list.push_back(lsec->GetS() + lane->GetMaterialByIdx(l)->s_offset);
+                    printf("Inserting friction vertex at lane %d s %.2f\n", lane->GetId(), lsec->GetS() + lane->GetMaterialByIdx(l)->s_offset);
+                }
+            }
+            // sort material s-values
+            std::cout << "s values before sorting" << std::endl;
+            for (const auto& s : friction_s_list)
+                std::cout << s << ' ' << std::endl;
+            std::sort(friction_s_list.begin(), friction_s_list.end());
+            std::cout << "s values after sorting" << std::endl;
+            for (const auto& s : friction_s_list)
+                std::cout << s << ' ' << std::endl;
+            // remove duplicates
+            friction_s_list.erase(std::unique(friction_s_list.begin(), friction_s_list.end(), compare_s_values), friction_s_list.end());
+            std::cout << "s values after removed duplicates" << std::endl;
+            for (const auto& s : friction_s_list)
+                std::cout << s << ' ' << std::endl;
+
+            // collect a list of s values where vertices are needed
+            int friction_s_list_index = friction_s_list.size() > 0 ? 1 : -1;
+            bool done_section          = false;
+            for (int counter = 1; !done_section && counter > 0; counter++)
             {
                 double s_min = lsec->GetS() + lsec->GetLength();
-                done         = true;
+                done_section = true;
 
                 if (counter == 1)
                 {
                     // First add s = start of lane section, to set start of mesh
                     s_list.push_back(lsec->GetS());
-                    done = false;
+                    done_section = false;
                 }
                 else
                 {
@@ -501,27 +536,35 @@ RoadGeom::RoadGeom(roadmanager::OpenDrive* odr)
                         // Find next s-value for this lane - go forward until error becomes too large
                         for (; l < osiPoints.size(); l++)
                         {
-                            // generate point at this s-value
-                            pos.SetTrackPos(road->GetId(),
-                                            osiPoints[l].s,
-                                            SIGN(lane->GetId()) * lsec->GetOuterOffset(osiPoints[l].s, lane->GetId()),
-                                            true);
-
-                            // calculate horizontal error at this s value
-                            double error_horizontal = DistanceFromPointToLine2DWithAngle(pos.GetX(),
-                                                                                         pos.GetY(),
-                                                                                         geom_point_list.back()[k].x,
-                                                                                         geom_point_list.back()[k].y,
-                                                                                         geom_point_list.back()[k].h);
-
-                            // calculate vertical error at this s value
-                            double error_vertical = abs((pos.GetZ() - geom_point_list.back()[k].z) -
-                                                        geom_point_list.back()[k].slope * (pos.GetS() - geom_point_list.back()[k].s));
-
-                            if (error_horizontal > MAX_GEOM_ERROR || error_vertical > MAX_GEOM_ERROR)
+                            if (friction_s_list_index > -1 && osiPoints[l].s > friction_s_list[friction_s_list_index])
                             {
-                                done = false;
+                                done_section = false;
                                 break;
+                            }
+                            else
+                            {
+                                // generate point at this s-value
+                                pos.SetTrackPos(road->GetId(),
+                                                osiPoints[l].s,
+                                                SIGN(lane->GetId()) * lsec->GetOuterOffset(osiPoints[l].s, lane->GetId()),
+                                                true);
+
+                                // calculate horizontal error at this s value
+                                double error_horizontal = DistanceFromPointToLine2DWithAngle(pos.GetX(),
+                                                                                             pos.GetY(),
+                                                                                             geom_point_list.back()[k].x,
+                                                                                             geom_point_list.back()[k].y,
+                                                                                             geom_point_list.back()[k].h);
+
+                                // calculate vertical error at this s value
+                                double error_vertical = abs((pos.GetZ() - geom_point_list.back()[k].z) -
+                                                            geom_point_list.back()[k].slope * (pos.GetS() - geom_point_list.back()[k].s));
+
+                                if (error_horizontal > MAX_GEOM_ERROR || error_vertical > MAX_GEOM_ERROR)
+                                {
+                                    done_section = false;
+                                    break;
+                                }
                             }
                         }
 
@@ -543,7 +586,12 @@ RoadGeom::RoadGeom(roadmanager::OpenDrive* odr)
                             s_index[k] = static_cast<int>(osiPoints.size()) - 1;  // add last OSI point for end of mesh
                         }
 
-                        if (osiPoints[static_cast<unsigned int>(s_index[k])].s < s_min)
+                        if (friction_s_list_index > -1 && osiPoints[l].s > friction_s_list[friction_s_list_index] && friction_s_list[friction_s_list_index] < s_min)
+                        {
+                            s_min = friction_s_list[friction_s_list_index];
+                            friction_s_list_index = friction_s_list_index < friction_s_list.size() - 1 ? friction_s_list_index + 1 : -1;
+                        }
+                        else if (osiPoints[static_cast<unsigned int>(s_index[k])].s < s_min)
                         {
                             s_min = osiPoints[static_cast<unsigned int>(s_index[k])].s;  // register pivot s-value
                         }
@@ -581,9 +629,11 @@ RoadGeom::RoadGeom(roadmanager::OpenDrive* odr)
 
                     for (size_t k = 0; k < static_cast<unsigned int>(lsec->GetNumberOfLanes()); k++)
                     {
-                        lane = lsec->GetLaneByIdx(static_cast<int>(k));
+                        lane            = lsec->GetLaneByIdx(static_cast<int>(k));
+                        roadmanager::Lane::Material* mat = lane->GetMaterialByS(s - lsec->GetS());
+                        double friction = mat != nullptr ? mat->friction : DEFAULT_FRICTION;
                         pos.SetTrackPos(road->GetId(), s, SIGN(lane->GetId()) * lsec->GetOuterOffset(s, lane->GetId()), true);
-                        geom_point.push_back({pos.GetX(), pos.GetY(), pos.GetZ(), pos.GetH(), pos.GetZRoadPrim(), pos.GetS()});
+                        geom_point.push_back({pos.GetX(), pos.GetY(), pos.GetZ(), pos.GetH(), pos.GetZRoadPrim(), pos.GetS(), friction});
                     }
 
                     geom_point_list.push_back(geom_point);
@@ -604,6 +654,7 @@ RoadGeom::RoadGeom(roadmanager::OpenDrive* odr)
                 osg::ref_ptr<osg::DrawElementsUInt> indices;
                 int                                 vidxLocal = 0;
                 lane                                          = lsec->GetLaneByIdx(static_cast<int>(k));
+                double friction                               = geom_point_list.size() > 0 ? geom_point_list[0][k].friction : DEFAULT_FRICTION;
 
                 if (k > 0)
                 {

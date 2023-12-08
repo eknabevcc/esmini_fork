@@ -684,6 +684,8 @@ int ScenarioEngine::step(double deltaSimTime)
             {
                 scenarioGateway.updateObjectVisibilityMask(obj->id_, obj->visibilityMask_);
             }
+
+            // Friction is not considered
         }
         else
         {
@@ -1134,6 +1136,36 @@ void ScenarioEngine::prepareGroundTruth(double dt)
 
         // Report updated pos values to the gateway
         scenarioGateway.updateObjectPos(obj->id_, simulationTime_, &obj->pos_);
+
+        // Report friction coefficients to gateway
+        double friction[4] = {1.0, 1.0, 1.0, 1.0};
+        for (int j = 0; j < 4; j++)
+        {
+            roadmanager::Position wp = obj->pos_;
+            if (j == 0)
+            {
+                wp.MoveAlongS(2.0 * wp.GetDrivingDirectionRelativeRoad(), 1.0, 0.0, false);
+            }
+            else if (j == 1)
+            {
+                wp.MoveAlongS(2.0 * wp.GetDrivingDirectionRelativeRoad(), -1.0, 0.0, false);
+            }
+            else if (j == 2)
+            {
+                wp.MoveAlongS(-2.0 * wp.GetDrivingDirectionRelativeRoad(), 1.0, 0.0, false);
+            }
+            else if (j == 3)
+            {
+                wp.MoveAlongS(-2.0 * wp.GetDrivingDirectionRelativeRoad(), -1.0, 0.0, false);
+            }
+
+            roadmanager::RoadLaneInfo info;
+            wp.GetRoadLaneInfo(&info);
+            friction[j] = info.friction;
+            printf("friction[%d]: %.2f\n", j, friction[j]);
+
+        }
+        scenarioGateway.updateObjectFrictionCoefficients(obj->id_, friction);
 
         // Now that frame is complete, reset dirty bits to avoid circulation
         if (o)
