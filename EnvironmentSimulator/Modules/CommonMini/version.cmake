@@ -47,6 +47,9 @@ set(VERSION_TO_TXT_FILE
     "ESMINI_GIT_REV=\"${GIT_REV}\"\nESMINI_GIT_TAG=\"${GIT_TAG}\"\nESMINI_GIT_BRANCH=\"${GIT_BRANCH}\"\nESMINI_BUILD_VERSION=\"${ESMINI_BUILD_VERSION}\""
 )
 
+message(STATUS cmake_version:)
+message(STATUS ${VERSION_TO_TXT_FILE})
+
 configure_file(
     "version.cpp.in"
     "${CMAKE_CURRENT_SOURCE_DIR}/version.cpp"
