@@ -5,6 +5,9 @@ execute_process(
     OUTPUT_VARIABLE GIT_REV
     ERROR_QUIET)
 
+message(STATUS git_rev:)
+message(STATUS ${GIT_REV})
+
 # Check whether we got any revision (which isn't always the case, e.g. when someone downloaded a zip file from Github instead of a checkout)
 if("${GIT_REV}"
    STREQUAL
