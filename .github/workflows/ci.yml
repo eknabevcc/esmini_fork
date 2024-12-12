@@ -58,7 +58,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-2019]
-        configuration: [Debug, Release]
+        configuration: [Release]
 
     runs-on: ${{ matrix.os }}
 

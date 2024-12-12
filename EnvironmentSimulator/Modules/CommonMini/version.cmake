@@ -2,8 +2,7 @@
 #
 execute_process(
     COMMAND git describe --long --dirty --broken
-    OUTPUT_VARIABLE GIT_REV
-    ERROR_QUIET)
+    OUTPUT_VARIABLE GIT_REV)
 
 message(STATUS git_rev:)
 message(STATUS ${GIT_REV})
