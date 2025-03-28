@@ -2,16 +2,9 @@ message(
     STATUS "CMake version: "
            ${CMAKE_VERSION})
 
-if(WIN32)
-    cmake_minimum_required(
-        VERSION 3.7.1 # for cmake generator VisualStudio 2017 support
-        # VERSION 3.14   # for cmake generator VisualStudio 2019 support VERSION 3.19   # for cmake presets support
-        FATAL_ERROR)
-else()
-    cmake_minimum_required(
-        VERSION 2.8.12...3.5
-        FATAL_ERROR)
-endif()
+cmake_minimum_required(
+    VERSION 3.14 # VisualStudio 2019 generator support introduced
+    FATAL_ERROR)
 
 # ############################# Project generate options ###########################################################
 
@@ -46,8 +39,9 @@ set(ENABLE_SANITIZERS
     CACHE BOOL
           "Enable sanitizers (Only valid for Linux and Mac OS)")
 
+# static code analysis not in works yet, need prep e.g. excluding external modules
 set(ENABLE_STATIC_ANALYSIS
-    ON
+    OFF
     CACHE BOOL
           "Enable CppCheck and clang-tidy")
 
